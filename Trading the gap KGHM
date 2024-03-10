@@ -1,0 +1,481 @@
+SetOption("CommissionMode",3);    
+    SetOption( "CommissionAmount", 3 ); // ustawienie prowizji    
+    SetOption( "initialequity", 15000 ); //kapital poczatkowy 10000    
+    SetOption( "futuresmode", True ); // tryb pochodne (futures)    
+    SetOption( "AllowSameBarExit" , True ); //nie pozwala na wyjscia na tej samej swiecy co wejscie    
+    SetOption( "AllowPositionShrinking", False );    
+    SetOption( "ActivateStopsImmediately", False ); //stopy sa sprawdzane od razu po wejsciu w pozycje (reakcja juz na slupku z sygnalem kupna)    
+    SetOption( "minshares", 1 ); //minimalna ilosc kontraktów    
+    SetOption( "ReverseSignalForcesExit", True );           
+MarginDeposit=C*100*0.1456;                                                        
+RoundLotSize=1;              
+TickSize=0.01;     
+slippage=0.5*TickSize;                            
+SetPositionSize(2,spsShares);             
+                                            
+PointValue=100;                                       
+  
+ //OptimizerSetEngine("cmae"); // you can also use "spso" or "trib" here      
+                       
+  SetChartOptions(0,chartShowArrows|chartShowDates);            
+_N(Title = StrFormat("{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ));            
+Plot( C, "Close", ParamColor("Color", colorDefault ), styleNoTitle | ParamStyle("Style") | GetPriceStyle() );                                      
+ 
+                     
+SetTradeDelays(0,0,0,0);   
+tn = TimeNum(); 
+startTime = 090000; // start in HHMMSS format 
+endTime = 100000;  // end in HHMMSS format 
+startTime2 = 100000;  
+endTime2 = 170000; 
+timeOK = tn >= startTime AND tn <= endTime; 
+timeOk2=tn>=startTime2 AND tn<=endTime2; 
+dolek=Ref(LLV(L,BarsSince(timeOk)),-1); 
+szczyt=Ref(HHV(H,BarsSince(timeOk)),-1); 
+Plot(szczyt,"szczyt", colorBlue,styleLine);   
+Plot(dolek,"dolek", colorRed,styleLine);   
+Buy=O >Ref(C,-1)  AND Hour()==09 
+AND O >TimeFrameGetPrice("H",inDaily,-1); 
+Sell=Cross(dolek,Low) AND timeOk2  OR  (BarsSince(Buy)>15 AND Hour()==17);  
+Short=O <Ref(C,-1)  AND Hour()==09 
+AND O <TimeFrameGetPrice("L",inDaily,-1) ; 
+Cover=Cross(H,szczyt) AND timeOk2  OR ( BarsSince(Short)>15 AND Hour()==17); 
+BuyPrice=O; 
+ShortPrice=O; 
+CoverPrice=IIf (BarsSince(Short)>15 AND Hour()==17,C,szczyt+0.01); 
+SellPrice=IIf(BarsSince(Buy)>15 AND Hour()==17,C,dolek-0.01); 
+ 
+ 
+ 
+ Short=ExRem(Short,Cover);                                                                
+Cover=ExRem(Cover,Short);                                           
+ Buy=ExRem(Buy,Sell);                                     
+ Sell=ExRem(Sell,Buy); 
+ //////////////////////////////////////////////////// 
+ 
+PlotShapes(Buy*shapeUpTriangle,colorBlue,0,L,-10,0);   
+PlotShapes(sell*shapeDownTriangle,colorgold,0,H,-10,0);                                               
+PlotShapes(Short*shapeDownTriangle,colorBlack,0,H,-20,0);                                                
+PlotShapes(Cover*shapeUpTriangle,colorGold,0,L,-16,0);
+
+//#########################################
+//# FIBONACCI AUTOMAT VER4.0					#
+//# DATA: 2010.05.18								#
+//# WYKONAŁ: WOJCIECH FILIPEK					#
+//# EMAIL: wojciechfilipek78@gmail.com		#
+//#########################################
+
+SetChartOptions(0, chartShowDates);
+SetBarsRequired(10000,10000);
+GraphXSpace=Param("Zwężenie pionowe wykresu",5,0,300,1);
+//if(ParamToggle("Zmień tło","NIE|TAK",0))
+//{
+//SetChartBkColor(IIf(GetChartBkColor()==colorWhite,colorBlack,colorWhite));
+//}
+""+(Status("lastvisiblebar")-Status("firstvisiblebar"));
+
+kolor_0618=ParamColor("Kolor: zniesienie 0.618",colorRed);
+kolor_0382=ParamColor("Kolor: zniesienie 0.382",colorGreen);
+kolor_S=ParamColor("Kolor: tekst S",colorBlack);
+kolor_R=ParamColor("Kolor: tekst R",colorBlack);
+kolor_arc=ParamColor("Kolor: łuki",colorLightGrey);
+kolor_poziom=ParamColor("Kolor: linia R/S",colorBlack);
+
+RequestTimedRefresh( 1 );
+
+Plot(C,"",colorBlack,styleBar,Null,Null,0,1);
+
+//======================
+pxchartright = Status("pxChartRight");//zwraca koordynate Y z lewego górnego rogu
+_SECTION_BEGIN("GFX X Conversion");
+function tpX(bar) {
+lvb = Status("LastVisibleBar");
+fvb = Status("FirstVisibleBar");
+pxchartleft = Status("pxChartLeft");
+pxchartright = Status("pxChartRight");
+pxheight = Status("pxheight");
+pxchartwidth = Status("pxChartWidth");
+return pxchartleft+(bar-fvb)*pxchartwidth/(Lvb-fvb+1); }
+_SECTION_END();
+//======================
+_SECTION_BEGIN("GFX Y Conversion");
+function tPY(Value) {
+local Miny, Maxy, pxchartbottom, pxchartheight;
+Miny = Status("AxisMiny");
+Maxy = Status("AxisMaxy");
+pxchartbottom = Status("pxChartBottom");
+pxchartheight = Status("pxChartHeight");
+return pxchartbottom - floor(0.5 +(Value-Miny)*pxchartheight/(Maxy-Miny)); }
+_SECTION_END();
+//======================
+_SECTION_BEGIN("GFX Text+Label, GFX Y, Std X");
+dec=1.2; ha=0;
+zoomtext=(Status("lastvisiblebar")-Status("firstvisiblebar"));
+zoomlinie=IIf(zoomtext<100 AND zoomtext>80,2,IIf(zoomtext<80 AND zoomtext>50,3,IIf(zoomtext<50,4,0)));
+
+procedure gtx(val,color,string,xpos)
+ {
+GfxSetTextColor(color);
+gtext=GfxDrawText(StrExtract(string,0)+" "+NumToStr(val,dec)+" ",xpos,tpY(val)+ha,0,0,256);
+return gtext;
+ }
+_SECTION_END();
+//======================
+
+//stałe
+bi = BarIndex();
+Lbi = LastValue(bi);
+
+GfxSelectFont("curier",IIf(zoomtext>=250 AND zoomtext<500,7,IIf(zoomtext>=500,6,IIf(zoomtext<150,9,8))), 700 );
+ GfxSetBkColor(colorBlack);
+ GfxSetOverlayMode(0);
+
+ GfxSetBkMode(1);//1 - brak tła dla tekstu, 2 - włącz tło dla tekstu
+//=======================
+
+//funkcja fibonacci
+R=0;
+nazwa="R1";
+_shf=0;
+startx=0;
+starty=0;
+shf=0;
+procedure fibonacci(R,nazwa,_shf)
+{
+
+StartX = LastValue( ValueWhen(BarIndex()==R,BarIndex()) );
+StartY =  LastValue(L[startx]);
+
+Hh=LastValue(ValueWhen(H==HighestSince( BarIndex()==startx , H, 1 ),BarIndex()) );
+F=H[Hh];
+
+Rx=starty;
+poziom0382= F - (F - Rx) * 0.382;
+poziom0618= F - (F - Rx) * 0.618;
+
+	if(startx)//AND Now(7)<6 AND Now(8)<=2010)
+	{
+	shf = Param("Przesuń "+nazwa,_shf,-50,50,0.5);
+
+	Lin=LineArray(startx-shf+1 ,starty,Lbi,starty,0);
+
+zorder=2;
+
+//	Plot(Lin,"",colorBlack,styleDots|styleNoLabel,0,0,shf-1,zorder);
+//dla gfx: rysuje nie widoczną linię aby widoczny był cały zakres
+//wraz z linią poziomą R
+Plot(Lin,"",colorBlack,styleNoDraw,0,0,shf-1,zorder);
+
+	Lin=LineArray(startx,starty,Hh,F,0);
+//	Plot(Lin,"",colorBlue,styleSwingDots|styleDashed|styleNoLabel,0,0,0,zorder);
+
+	Lin=LineArray(Lbi-5 ,poziom0382,Lbi-6,poziom0382,1);
+//	Plot(Lin,"",colorGreen,styleDots+styleNoLabel,0,0,shf,zorder);
+
+	Lin=LineArray(Lbi-5 ,poziom0618,Lbi-6,poziom0618,1);
+//	Plot(Lin,"",colorRed,styleDots+styleNoLabel,0,0,shf,zorder);
+
+	Lin=LineArray(Lbi-1,starty,lbi ,poziom0382,0);
+//	Plot(Lin,"",colorWhite,styleLine +styleDashed+styleNoLabel,0,0,shf,zorder);
+
+
+//Linia R
+GfxSelectPen(kolor_poziom, 1 ,0);
+GfxMoveTo( tpx(startx+1), tpy(starty));
+GfxLineTo( tpx(Lbi+shf-zoomlinie),tpy(starty));
+//łuk R do 0.618
+GfxSelectPen( kolor_arc);
+GfxArc(tpx(Lbi-0.8+shf-2-zoomlinie),tpy(poziom0618), tpx(Lbi+2.5+shf-zoomlinie),tpy(starty),tpx(Lbi+shf-zoomlinie),tpy(starty),tpx(Lbi+shf-zoomlinie), tpy(poziom0618) );
+//łuk 0.618 do 0.382
+GfxSelectPen( kolor_arc);
+GfxArc(tpx(Lbi-0.8+shf-2-zoomlinie),tpy(poziom0382), tpx(Lbi+2.2+shf-zoomlinie),tpy(poziom0618),tpx(Lbi+shf-zoomlinie),tpy(poziom0618),tpx(Lbi+shf-zoomlinie), tpy(poziom0382) );
+//opcja: linia pionowa zamiast łuków
+//GfxSelectPen(colorWhite, 1,0 );		
+//GfxMoveTo( tpx(Lbi+shf), tpy(starty));
+//GfxLineTo( tpx(Lbi+shf),tpy(poziom0382));
+
+//poziom 0.382
+GfxSelectPen(kolor_0382, 1 ,0);
+		GfxMoveTo( Min(tpX(Lbi+shf-4),pxchartright-1), tpy(poziom0382));
+    	GfxLineTo( tpx(Lbi+shf-zoomlinie),tpy(poziom0382));
+
+//poziom 0.618
+GfxSelectPen(kolor_0618, 1 ,0);
+		GfxMoveTo( Min(tpX(Lbi+shf-4),pxchartright-1), tpy(poziom0618));
+    	GfxLineTo( tpx(Lbi+shf-zoomlinie),tpy(poziom0618));
+
+//Tekst
+//htx = Param("Tekst Shift",0,-200,150,1);
+//xp=Min(tpX(htx+sbi),pxchartright-70);
+if(zoomtext<=350)
+{
+	ha=3;GfxSetBkColor(colorBlack);
+	gtx(starty,kolor_R,nazwa+" ",tpx(startx)/*xp*/); //R
+
+	ha=-27;
+	gtx(f,kolor_R,"F ",tpx(Hh));//F
+
+	ha=-14; GfxSetBkColor(colorGreen);
+	gtx(poziom0382,kolor_0382,"",Min(tpX(Lbi+shf-5),pxchartright-1));
+	ha=1;
+	//GfxDrawText("   0.382",tpx(Lbi+shf-6),tpY(poziom0382)+ha,0,0,256);
+
+GfxDrawText("   0.382",Min(tpX(Lbi+shf-5),pxchartright-1),tpY(poziom0382)+ha,0,0,256);
+
+	ha=-14; GfxSetBkColor(colorDarkRed);
+	gtx(poziom0618,kolor_0618,"",Min(tpX(Lbi+shf-5),pxchartright-1));
+	ha=1;
+	GfxDrawText("   0.618",Min(tpX(Lbi+shf-5),pxchartright-1),tpY(poziom0618)+ha,0,0,256);  
+}
+	}
+
+
+}
+//koniec funkcji
+//main
+nazwa="RA";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,6);
+nazwa="RB";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,12);
+nazwa="RC";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,18);
+nazwa="RD";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,24);
+nazwa="RE";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,30);
+nazwa="RF";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,36);
+nazwa="RG";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,42);
+nazwa="RH";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,48);
+nazwa="RI";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,54);
+nazwa="RJ";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,60);
+nazwa="RK";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,66);
+nazwa="RL";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,72);
+nazwa="RM";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,78);
+nazwa="RN";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,84);
+nazwa="RO";
+fibonacci(Study(nazwa, GetChartID() ),nazwa,90);
+//###############################################
+//Opory S
+//funkcja fibonacci
+S=0;
+nazwa="S1";
+_shf=0;
+startx=0;
+starty=0;
+shf=0;
+procedure fibonacciS(S,nazwa,_shf)
+{
+
+StartX = LastValue( ValueWhen(BarIndex()==S,BarIndex()) );
+StartY =  LastValue(H[startx]);
+
+Hh=LastValue(ValueWhen(L==LowestSince( BarIndex()==startx , L, 1 ),BarIndex()) );
+F=L[Hh];
+
+Rx=starty;
+poziom0382= F + (Rx-f) * 0.382;
+poziom0618= F + (Rx-f) * 0.618;
+
+	if(startx)// AND Now(7)<6 AND Now(8)<=2010)
+	{
+	shf = Param("Przesuń "+nazwa,_shf,-50,50,0.5);
+
+	Lin=LineArray(startx-shf+1 ,starty,Lbi,starty,0);
+
+zorder=2;
+
+//	Plot(Lin,"",colorBlack,styleDots|styleNoLabel,0,0,shf-1,zorder);
+//dla gfx: rysuje nie widoczną linię aby widoczny był cały zakres
+//wraz z linią poziomą R
+Plot(Lin,"",colorBlack,styleNoDraw,0,0,shf-1,zorder);
+
+	Lin=LineArray(startx,starty,Hh,F,0);
+//	Plot(Lin,"",colorBlue,styleSwingDots|styleDashed|styleNoLabel,0,0,0,zorder);
+
+	Lin=LineArray(Lbi-5 ,poziom0382,Lbi-6,poziom0382,1);
+//	Plot(Lin,"",colorGreen,styleDots+styleNoLabel,0,0,shf,zorder);
+
+	Lin=LineArray(Lbi-5 ,poziom0618,Lbi-6,poziom0618,1);
+//	Plot(Lin,"",colorRed,styleDots+styleNoLabel,0,0,shf,zorder);
+
+	Lin=LineArray(Lbi-1,starty,lbi ,poziom0382,0);
+//	Plot(Lin,"",colorWhite,styleLine +styleDashed+styleNoLabel,0,0,shf,zorder);
+
+
+
+//Linia S
+GfxSelectPen(kolor_poziom, 1 ,0);
+GfxMoveTo( tpx(startx+1), tpy(starty));
+GfxLineTo( tpx(Lbi+shf-zoomlinie),tpy(starty));
+//łuk S do 0.618
+GfxSelectPen( kolor_arc);
+GfxArc(tpx(Lbi-0.8+shf-2-zoomlinie),tpy(poziom0618), tpx(Lbi+2.5+shf-zoomlinie),tpy(starty),tpx(Lbi+shf-zoomlinie),tpy(poziom0618),tpx(Lbi+shf-zoomlinie), tpy(starty) );
+//łuk 0.618 do 0.382
+GfxSelectPen( kolor_arc);
+GfxArc(tpx(Lbi-0.8+shf-2-zoomlinie),tpy(poziom0382), tpx(Lbi+2.2+shf-zoomlinie),tpy(poziom0618),tpx(Lbi+shf-zoomlinie),tpy(poziom0382),tpx(Lbi+shf-zoomlinie), tpy(poziom0618) );
+//opcja: linia pionowa zamiast łuków
+//GfxSelectPen(colorWhite, 1,0 );		
+//GfxMoveTo( tpx(Lbi+shf), tpy(starty));
+//GfxLineTo( tpx(Lbi+shf),tpy(poziom0382));
+
+//poziom 0.382
+GfxSelectPen(kolor_0382, 1 ,0);
+		GfxMoveTo(Min(tpX(Lbi+shf-4),pxchartright-1), tpy(poziom0382));
+    	GfxLineTo( tpx(Lbi+shf-zoomlinie),tpy(poziom0382));
+
+//poziom 0.618
+GfxSelectPen(kolor_0618, 1 ,0);
+		GfxMoveTo( Min(tpX(Lbi+shf-4),pxchartright-1), tpy(poziom0618));
+    	GfxLineTo( tpx(Lbi+shf-zoomlinie),tpy(poziom0618));
+
+//Tekst
+//htx = Param("Tekst Shift",0,-200,150,1);
+//xp=Min(tpX(htx+sbi),pxchartright-70);
+
+
+if(zoomtext<=350)
+{
+	ha=-15;GfxSetBkColor(colorBlack);
+	gtx(starty,kolor_S,nazwa+" ",tpx(startx)/*xp*/); //S
+
+	ha=15;
+	gtx(f,kolor_S,"F ",tpx(Hh));//F
+
+	ha=-14; GfxSetBkColor(colorGreen);
+	gtx(poziom0382,kolor_0382,"",Min(tpX(Lbi+shf-5),pxchartright-1));
+	ha=1;
+	GfxDrawText("   0.382",Min(tpX(Lbi+shf-5),pxchartright-1),tpY(poziom0382)+ha,0,0,256);
+
+	ha=-14; GfxSetBkColor(colorDarkRed);
+	gtx(poziom0618,kolor_0618,"",Min(tpX(Lbi+shf-5),pxchartright-1));
+	ha=1;
+	GfxDrawText("   0.618",Min(tpX(Lbi+shf-5),pxchartright-1),tpY(poziom0618)+ha,0,0,256);  
+}
+	}
+
+}
+//koniec funkcji
+//main
+nazwa="SA";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,6);
+nazwa="SB";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,12);
+nazwa="SC";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,18);
+nazwa="SD";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,24);
+nazwa="SE";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,30);
+nazwa="SF";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,36);
+nazwa="SG";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,42);
+nazwa="SH";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,48);
+nazwa="SI";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,54);
+nazwa="SJ";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,60);
+nazwa="SK";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,66);
+nazwa="SL";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,72);
+nazwa="SM";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,78);
+nazwa="SN";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,84);
+nazwa="SO";
+fibonacciS(Study(nazwa, GetChartID() ),nazwa,90);
+//xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Title = EncodeColor(55)+ Title = Name() + " " + EncodeColor(colorBlue) + Date() + " " + EncodeColor(colorYellow) + "{{INTERVAL}} " +
+EncodeColor(colorPaleTurquoise)+ " Open = "+ EncodeColor(18)+ WriteVal(O,dec) +
+EncodeColor(colorPaleTurquoise)+ " High = "+ EncodeColor(18) + WriteVal(H,dec) +
+EncodeColor(colorPaleTurquoise)+ " Low = "+ EncodeColor(18)+ WriteVal(L,dec) +
+EncodeColor(colorPaleTurquoise)+ " Close = "+ EncodeColor(18)+ WriteVal(C,dec) +
+EncodeColor(colorPaleTurquoise)+ " Volume = "+EncodeColor(18)+ WriteVal(V,1.0);
+///////////////////////////////////////////////////////////////////////////////////////////
+_SECTION_BEGIN("Background text");    
+C11=ParamColor("up panel",colorBlack );    
+C12=ParamColor("dn panel",colorBlue );    
+C13=Param("fonts",30,10,30,1 );    
+C14=Param("left-right",4.1,1.0,5.0,0.1 );    
+C15=Param("up-down",1,1,30,1 );    
+Miny = Status("axisminy");    
+Maxy = Status("axismaxy");    
+lvb = Status("lastvisiblebar");    
+fvb = Status("firstvisiblebar");    
+pxwidth = Status("pxwidth");    
+pxheight = Status("pxheight");    
+    
+pricechange=(C-Ref(C,-1))*100/Ref(C,-1);    
+changeponit=C-Ref(C,-1);    
+Vlp=Param("Volume lookback period",15,10,300,10);    
+Vrg=MA(V,Vlp);    
+St = StDev(Vrg,Vlp);     
+Vp3 = Vrg + 3*st;     
+Vp2 = Vrg + 2*st;;    
+Vp1 = Vrg + 1*st;;    
+Vn1 = Vrg -1*st;     
+Vn2 = Vrg -2*st;     
+    
+x=Param("xposn",1,0,1000,1);    
+y=Param("yposn",1,0,1000,1);    
+    
+GfxGradientRect( 1, 1, 1400, 40, colorGrey50, colorDarkGrey);    
+GfxSetBkMode(0);    
+GfxSelectFont( "Georgia", 18, 800, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( "Trading the Gap KGHM ", x+600, y+10 );    
+GfxSelectFont( "Tahoma", 16, 800, False );    
+GfxSetTextColor( colorGold );    
+GfxTextOut( Name(), x+100, y+10 );    
+GfxSelectFont( "Century Gothic", 15, 100, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( Date(), x+1000, y+10 );    
+GfxSelectFont( "Comic Sans MS", 15, 500, False );    
+GfxSetTextColor( colorYellow );    
+GfxTextOut( Interval(2), x+275, y+10 );    
+//------------------------------------------------------------ H, L, O, C----------------------    
+GfxGradientRect( 1, 40, 1400, 70, colorGrey40, colorDarkGrey );    
+GfxSetBkMode(0);    
+GfxSelectFont( "Areal", 9, 200, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( "High:"+WriteVal(H,1.2), x+100, y+40 );    
+GfxSelectFont( "Areal", 9, 200, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( "Low:"+WriteVal(L,1.2), x+200, y+40 );    
+GfxSelectFont( "Areal", 9, 200, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( "Open:"+WriteVal(O,1.2), x+300, y+40 );    
+GfxSelectFont( "Areal", 9, 200, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( "Close:"+WriteVal(C,1.2), x+400, y+40 );    
+GfxSelectFont( "Script MT Bold", 12, 100, False );    
+GfxSetTextColor( colorWhite );    
+GfxTextOut( "Created by... Piotr Stypulkowski ", x+1000, y+39 );
+
+_SECTION_BEGIN("DispMA");
+P = ParamField("Field");
+Type = ParamList("Type", "Simple,Exponential,Double Exponential,Tripple Exponential,Wilders,Weighted");
+Periods = Param("Periods", 30, 2, 300 );
+Displacement = Param("Displacement", 15, -50, 50 );
+m = 0;
+
+if( Type == "Simple" ) 					m = MA( P, Periods );
+if( Type == "Exponential" ) 			m = EMA( P, Periods );
+if( Type == "Double Exponential" ) 	m = DEMA( P, Periods );
+if( Type == "Tripple Exponential" ) 	m = TEMA( P, Periods );
+if( Type == "Wilders" ) 				m = Wilders( P, Periods );
+if( Type == "Weighted" ) 				m = WMA( P, Periods );
+
+Plot( m, _DEFAULT_NAME(), ParamColor("Color", ColorCycle), ParamStyle("Style"), 0, 0, Displacement );
+_SECTION_END();
